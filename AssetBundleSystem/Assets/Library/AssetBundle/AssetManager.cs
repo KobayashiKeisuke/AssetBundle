@@ -20,6 +20,8 @@ namespace AssetManagerSystem
 		//--------------------------------------------
 		#region ===== CONSTS =====
 
+		const int DRFAULT_LOADED_ASSET_LIST_SIZE = 128;	// 同時に128個以上AssetをLoadする場合は要注意
+
 		/// <summary>
 		/// AssetBundleManifest関連の情報をまとめたクラス
 		/// </summary>
@@ -53,6 +55,20 @@ namespace AssetManagerSystem
 		
 		private bool m_isDownloadManifest = false;
 
+
+		// Load済Asset
+		private Dictionary<string, AssetData> m_loadedAssetDict = new Dictionary<string, AssetData>(DRFAULT_LOADED_ASSET_LIST_SIZE);
+		public Dictionary<string, AssetData> LoadedAssetDict{get{return m_loadedAssetDict;}}
+
+
+		/* Load 管理 */
+		List<UnityWebRequest> m_currentDownloadRequestList = new List<UnityWebRequest>();	// 現在実行中のRequest
+
+		private int m_totalRequestCount = 0;		// 現在実行しているRequest 数
+		public	int TotalReqCount{get{return m_totalRequestCount;}}
+
+		private int m_totalCompRequestCount = 0;	// 現在完了しているRequest 数
+		public	int TotalCompReqCount{get{return m_totalCompRequestCount;}}
 		#endregion //) ===== MEMBER_VARIABLES =====
 
 		//--------------------------------------------
@@ -74,9 +90,14 @@ namespace AssetManagerSystem
 
 
 		//--------------------------------------------
+		// API
+		//--------------------------------------------
+		#region ===== PUBLIC_API =====
+
+		//--------------------------------------------
 		// マニフェスト関連
 		//--------------------------------------------
-		#region ===== MANIFEST =====
+		#region ===== MANIFEST_PUBLIC_METHOD =====
 
 		/// <summary>
 		/// ManifestのValidation
@@ -84,36 +105,52 @@ namespace AssetManagerSystem
 		/// <returns></returns>
 		public bool IsValidManifest(){ return (Manifest != null && Manifest.HasManifest() ); }
 
-		public void LoadManifest()
+		/// <summary>
+		/// Manifest のLoadリクエスト
+		/// </summary>
+		/// <param name="_manifestVersion">バージョン</param>
+		public void LoadManifest( int _manifestVersion )
 		{
+			if( IsValidManifest() )
+			{
+				// 古いマニフェストは読み込ませない
+				if( Manifest.Version > _manifestVersion )
+				{
+					return;
+				}
+			}
 			StartCoroutine( DoLoadManifest() );
 		}
 
+		#endregion //) ===== MANIFEST_PUBLIC_METHOD =====	
+
+		//--------------------------------------------
+		// AssetBundle Load 
+		//--------------------------------------------
+		#region ===== LOAD_ASSET_BUNDLE_PUBLIC_METHOD =====
+
 		/// <summary>
-		/// 実際のAssetBundleManifest Download 実行場所
+		/// 指定のAssetBundleがLoad済みかどうかチェック
 		/// </summary>
+		/// <param name="_assetBundleName"></param>
 		/// <returns></returns>
-		IEnumerator DoLoadManifest()
+		public bool IsLoadedAssetBundle( string _assetBundleName )
 		{
-			while( m_isDownloadManifest )
+			foreach( KeyValuePair<string, AssetData> pair in LoadedAssetDict )
 			{
-				yield return null;
+				if( pair.Value == null )
+				{
+					continue;
+				}
+				if( pair.Value.AssetName == _assetBundleName )
+				{
+					return true;
+				}
 			}
-
-			m_isDownloadManifest = true;
-			
-
-			yield return null;
-
-
-			m_isDownloadManifest = false;
+			return false;
 		}
-		#endregion //) ===== MANIFEST =====	
 
-		//--------------------------------------------
-		// AssetBundle Load
-		//--------------------------------------------
-		#region ===== LOAD_ASSET_BUNDLE =====
+
 
 		/// <summary>
 		/// AssetBundle のロードリクエスト
@@ -143,17 +180,37 @@ namespace AssetManagerSystem
 				return;
 			}
 		}
+		#endregion //) ===== LOAD_ASSET_BUNDLE_PUBLIC_METHOD =====
 
-		private IEnumerator DoLoadAssetBundle( string[] _assetNames )
+		//--------------------------------------------
+		// Download AssetBundle
+		//--------------------------------------------
+		#region ===== DOWNLOAD_ASSET_BUNDLE_PUBLIC_METHOD =====
+
+		/// <summary>
+		/// Donwload 中?
+		/// </summary>
+		/// <returns></returns>
+		public bool IsDownloading(){ return TotalReqCount > 0; }
+
+		/// <summary>
+		/// 現在のDownload の進行度を取得
+		/// </summary>
+		/// <returns>Download中:[0.0 1.0], 停止中: -1.0f </returns>
+		public float GetCurrentDownloadProgress()
 		{
-			yield return null;
-		}
-		#endregion //) ===== LOAD_ASSET_BUNDLE =====
+			if( !IsDownloading() )
+			{
+				return -1.0f;
+			}
+			float progress = 0.0f;
+			for (int i = 0, length=m_currentDownloadRequestList.Count; i < length; i++)
+			{
+				progress += m_currentDownloadRequestList[i].downloadProgress;
+			}
 
-		//--------------------------------------------
-		// Download AssetBundle 
-		//--------------------------------------------
-		#region ===== DOWNLOAD_ASSET_BUNDLE =====
+			return progress / (float)TotalReqCount;
+		}
 
 		/// <summary>
 		/// AssetBundle のDownload
@@ -172,15 +229,7 @@ namespace AssetManagerSystem
 		{
 
 		}
-
-		private IEnumerator DoDownloadAssetBundle( string[] _assetNames )
-		{
-			yield return null;
-		}
-		#endregion //) ===== DOWNLOAD_ASSET_BUNDLE =====	
-
-
-
+		#endregion //) ===== DOWNLOAD_ASSET_BUNDLE_PUBLIC_METHOD =====
 
 		//--------------------------------------------
 		// Cache 関連
@@ -204,6 +253,23 @@ namespace AssetManagerSystem
 			return paths;
 		}
 
+		/// <summary>
+		/// キャッシュ上に存在するかチェック
+		/// </summary>
+		/// <param name="_assetBundleName"></param>
+		/// <returns></returns>
+		public bool IsAssetBundleExistAtCache( string _assetBundleName )
+		{
+			List<string> paths = GetAllCachedAssetPaths();
+			for (int i = 0, length=paths.Count; i < length; i++)
+			{
+				if( paths[i].Contains( _assetBundleName ))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
 
 		/// <summary>
 		/// 全キャッシュの削除
@@ -238,7 +304,106 @@ namespace AssetManagerSystem
 			return Caching.ClearCachedVersion( _assetName, Manifest.BundleManifest.GetAssetBundleHash(_assetName) );
 		}
 
-		#endregion //) ===== CACHE =====	
+		#endregion //) ===== CACHE =====
+
+		#endregion //) ===== PUBLIC_API =====
+
+
+		//--------------------------------------------
+		// マニフェスト関連（ private )
+		//--------------------------------------------
+		#region ===== MANIFEST_PRIVATE_METHOD =====
+
+		/// <summary>
+		/// 実際のAssetBundleManifest Download 実行場所
+		/// </summary>
+		/// <returns></returns>
+		IEnumerator DoLoadManifest()
+		{
+			while( m_isDownloadManifest )
+			{
+				yield return null;
+			}
+
+			m_isDownloadManifest = true;
+			
+
+        	// string url = RemoteAssetFilePath(_platform);
+			string url = string.Empty;
+			OnBeginDownload();
+        	UnityWebRequest www = UnityWebRequest.Get(url);
+        	www.downloadHandler = new AssetBundleDownloadHandler( OnCompleteDownload );
+			
+			// 登録
+			m_currentDownloadRequestList.Add( www );
+
+        	yield return www.SendWebRequest();
+        	if (www.isNetworkError || www.isHttpError)
+        	{
+        	    Debug.LogError("manifest load failed. error: " + www.error);
+        	    Debug.LogError("url: " + url);
+        	}
+			yield return null;
+			// 登録解除
+			m_currentDownloadRequestList.Remove( www );
+
+			m_isDownloadManifest = false;
+		}
+		#endregion //) ===== MANIFEST_PRIVATE_METHOD =====	
+
+
+		//--------------------------------------------
+		// AssetBundle Load ( private )
+		//--------------------------------------------
+		#region ===== LOAD_ASSET_BUNDLE_PRIVATE_METHOD =====
+
+		private IEnumerator DoLoadAssetBundle( string[] _assetNames )
+		{
+			yield return null;
+		}
+		#endregion //) ===== LOAD_ASSET_BUNDLE_PRIVATE_METHOD =====
+
+
+
+		//--------------------------------------------
+		// Download AssetBundle ( private )
+		//--------------------------------------------
+		#region ===== DOWNLOAD_ASSET_BUNDLE_PRIVATE_METHOD =====
+
+		private IEnumerator DoDownloadAssetBundle( string[] _assetNames )
+		{
+			yield return null;
+		}
+
+		/// <summary>
+		/// Download 開始時処理
+		/// </summary>
+		private void OnBeginDownload()
+		{
+			++m_totalRequestCount;
+		}
+
+		/// <summary>
+		/// AssetBundle Donwload 完了時コールバック
+		/// </summary>
+		private void OnCompleteDownload()
+		{
+			++m_totalCompRequestCount;
+			// 全DL完了
+			if( TotalReqCount == TotalCompReqCount)
+			{
+				m_totalRequestCount = 0;
+				m_totalCompRequestCount = 0;
+			}
+		}
+		#endregion //) ===== DOWNLOAD_ASSET_BUNDLE_PRIVATE_METHOD =====	
+	
+
+		//--------------------------------------------
+		// Editor向けDebug機能
+		//--------------------------------------------	
+		#if UNITY_EDITOR
+		#endif //) UNITY_EDITOR
 	}
 }
 
