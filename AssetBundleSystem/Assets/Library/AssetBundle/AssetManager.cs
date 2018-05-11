@@ -112,6 +112,7 @@ namespace AssetManagerSystem
 		#endregion //) ===== CACHE =====
 
 
+		public float GetProgress(){ return m_loadCtrl == null ? -1.0f : m_loadCtrl.GetProgress() ;}
 		#endregion //)  ===== PUBLIC_API =====
 
 

@@ -366,6 +366,8 @@ namespace AssetManagerSystem
 		#endregion ===== LOADED_ASSET_BUNDLE =====
 			
 
+		//DOwnload
+		public float GetProgress(){ return m_downloadCtrl == null ? -1.0f : m_downloadCtrl.GetCurrentProgress();}
 
 		//--------------------------------------------
 		// Utility 
