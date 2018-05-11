@@ -42,7 +42,9 @@ namespace AssetManagerSystem
 
 		public AssetData()
 		{
+			m_assetName = "";
 			m_refCount = 0;
+			m_targetBundle = null;
 		}
 
 		public AssetData( AssetBundle _loadedBundle, Hash128 _hash ) : this()
@@ -87,6 +89,36 @@ namespace AssetManagerSystem
 		}
 
 		#endregion //) ===== REFERENCE_COUNT =====
+
+
+		//--------------------------------------------
+		// Asset
+		//--------------------------------------------
+		#region ===== ASSETS =====
+
+		/// <summary>
+		/// このAssetBundle に対象のAssetが存在するか
+		/// </summary>
+		/// <param name="_assetName"></param>
+		/// <returns></returns>
+		public bool IsContainsAsset( string _assetName )
+		{
+			if( TargetBundle == null )
+			{
+				return false;
+			}
+			string[] names = TargetBundle.GetAllAssetNames();
+			for (int i = 0; i < names.Length; i++)
+			{
+				if( names[i] == _assetName )
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		#endregion //) ===== ASSETS =====
 	}
 
 }
