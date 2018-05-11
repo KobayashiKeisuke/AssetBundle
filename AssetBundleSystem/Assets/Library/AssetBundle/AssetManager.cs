@@ -40,6 +40,12 @@ namespace AssetManagerSystem
 
 			// AssetLoad Coroutine などを回すためDestroy対象外
 			DontDestroyOnLoad( this.gameObject );
+
+
+			AssetBundleCacheController.SetCacheConfig();
+
+			string path = Caching.currentCacheForWriting.path;
+			Debug.LogWarning(path);
 		}
 
 		#endregion //) ===== INIT =====
@@ -54,7 +60,7 @@ namespace AssetManagerSystem
 		/// AssetBundleManifest のロード
 		/// これを初めに行わないと始まらない
 		/// </summary>
-		public void LoadManifest(){}
+		public void LoadManifest(){	m_loadCtrl.LoadManifest(0); }
 
 		/// <summary>
 		/// Asset の取得

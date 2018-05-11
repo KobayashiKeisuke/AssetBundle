@@ -93,6 +93,8 @@ namespace AssetManagerSystem
 		/// <returns></returns>
 		public static　IEnumerator LoadAssetBundleFromCache( string _assetBundleName, AssetBundleManifest _manifest, OnCompleteLoadFromCache _onComplete )
 		{
+			Debug.LogWarning("Start Load From Cache");
+
 			string path = AssetBundleUtility.GetAssetBundlePath( _assetBundleName );
 			AssetBundleCreateRequest req = AssetBundle.LoadFromFileAsync(path);
 
@@ -107,6 +109,8 @@ namespace AssetManagerSystem
 				data = new AssetData( req.assetBundle, _manifest.GetAssetBundleHash(req.assetBundle.name) );
 			}
 
+			Debug.LogWarning("End Load From Cache");
+
 			if( _onComplete != null )
 			{
 				_onComplete.Invoke( isSucceeded, _assetBundleName, data );
@@ -114,6 +118,23 @@ namespace AssetManagerSystem
 		}
 
 		#endregion //) ===== LOAD =====		
+
+
+
+		//--------------------------------------------
+		// CONFIG
+		//--------------------------------------------
+
+		#region ===== CONFIG =====
+
+		public static void SetCacheConfig()
+		{
+			string path = Application.persistentDataPath;
+			Caching.AddCache( path );
+			Caching.currentCacheForWriting = Caching.GetCacheByPath( path);
+		}
+
+		#endregion //) ===== CONFIG =====		
 
 	}
 }

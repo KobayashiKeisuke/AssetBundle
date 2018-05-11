@@ -138,6 +138,7 @@ namespace AssetManagerSystem
 			AssetBundleCacheController.OnCompleteLoadFromCache OnCompleteCacheLoad = 
 			( bool _isSucceeded, string _abName, AssetData _data ) => 
 			{
+				Debug.Log("OnCompleteLoadFromCach "+_isSucceeded);
 				if( _isSucceeded )
 				{
 					// まずは成功データを登録
@@ -188,10 +189,13 @@ namespace AssetManagerSystem
 			}
 
 			// Download から全て実行
-			
+			string[] dlList = GetAssetBundleDownloadList( _assetBundleName );
 			m_coroutineExecutor.InvokeCoroutine( 
-				m_downloadCtrl.DoDownloadAssetBundle(_assetBundleName, (bool _isSucceeded , AssetBundle _ab )=>
+				m_downloadCtrl.DoDownloadAssetBundles(dlList,
+				//OnCompleteEach
+				(bool _isSucceeded , AssetBundle _ab )=>
 				{
+					Debug.Log("OnComplete Download "+_isSucceeded);
 					// Download 失敗
 					if( !_isSucceeded || _ab == null )
 					{
@@ -202,10 +206,65 @@ namespace AssetManagerSystem
 						}
 						return;
 					}
-					// あとはキャッシュロード完了後と同じ処理
-					OnCompleteCacheLoad( _isSucceeded, _assetBundleName, new AssetData( _ab, Manifest.BundleManifest.GetAssetBundleHash(_assetBundleName) ) );
-				})
+					// Download してきたAssetBundle の登録
+					RegisterAssetData( _ab.name, new AssetData( _ab, Manifest.BundleManifest.GetAssetBundleHash(_ab.name) ) );
+				},
+				// OnCompleteAll
+					(int succeededCount, string[] failedList)=>
+					{
+						// 成功したので続いてLoad
+						m_coroutineExecutor.InvokeCoroutine( 
+							LoadAsset<T>( _assetName, _assetBundleName, _onComplete )
+						);
+					}
+				)
 			);
+		}
+
+
+		/// <summary>
+		/// Manifest のロード
+		/// </summary>
+		public void LoadManifest( int _version )
+		{
+			if( IsValidManifest() )
+			{
+				if( !Manifest.IsRequiredUpdate( _version))
+				{
+					return;
+				}
+			}
+
+			m_coroutineExecutor.InvokeCoroutine( 
+				m_downloadCtrl.DoDownloadAssetBundles( 
+					new string[]{ AssetBundleUtility.GetPlatformName() },
+					(bool _isSucceeded , AssetBundle _ab )=>
+					{
+						// Download 失敗
+						if( !_isSucceeded || _ab == null )
+						{
+							return;
+						}
+
+						AssetBundleManifest manifest = _ab.LoadAsset("AssetBundleManifest") as AssetBundleManifest;
+						if( manifest != null )
+						{
+							Debug.LogWarning("Set Manifest");
+							m_manifestInfo = new ManifestInfo();
+							m_manifestInfo.BundleManifest = manifest;
+							m_manifestInfo.Version = _version;
+
+
+							var dep = Manifest.BundleManifest.GetAllAssetBundles();
+							for (int i = 0; i < dep.Length; i++)
+							{
+								Debug.LogWarning(dep[i]);
+							}
+						}
+					},
+					(int succeededCount, string[] failedList)=>{}
+				)
+			);			
 		}
 		#endregion //) ===== LOAD =====
 
@@ -330,6 +389,8 @@ namespace AssetManagerSystem
 		/// <returns></returns>
 		protected IEnumerator LoadAsset<T>(string _assetName, string _assetBundleName, OnCompleteLoadAsset<T> _onComplete ) where T : UnityEngine.Object
 		{
+			Debug.LogWarning("Start LoadAsset");
+
 			AssetData data = GetAssetData(_assetName, _assetBundleName);
 			if( data == null )
 			{
@@ -344,6 +405,8 @@ namespace AssetManagerSystem
 
 			// Wait
 			yield return req;
+
+			Debug.LogWarning("End LoadAsset");
 
 			if( req.asset != null )
 			{
@@ -369,6 +432,21 @@ namespace AssetManagerSystem
 		//DOwnload
 		public float GetProgress(){ return m_downloadCtrl == null ? -1.0f : m_downloadCtrl.GetCurrentProgress();}
 
+
+		public string[] GetAssetBundleDownloadList( string _assetBundleName)
+		{
+			if(string.IsNullOrEmpty(_assetBundleName))
+			{
+				return null;
+			}
+			List<string> list = new List<string>();
+			list.Add( _assetBundleName);
+			if( IsValidManifest() )
+			{
+				list.AddRange( Manifest.BundleManifest.GetAllDependencies(_assetBundleName));
+			}
+			return ValidateStringList( list );
+		}
 		//--------------------------------------------
 		// Utility 
 		//--------------------------------------------
@@ -404,6 +482,28 @@ namespace AssetManagerSystem
 			return names.ToArray();
 		}
 
+		/// <summary>
+		/// 空文字やNull を削除したListにするためのバリデーション
+		/// </summary>
+		/// <param name="list"></param>
+		/// <returns></returns>
+		private string[] ValidateStringList( List<string> list )
+		{
+			if(list == null || list.Count < 1)
+			{
+				return null;
+			}
+
+			for (int i = list.Count-1; i <= 0; i--)
+			{
+				if( string.IsNullOrEmpty( list[i]))
+				{
+					list.RemoveAt( i );
+				}
+			}
+
+			return list.ToArray();
+		}
 
 		#endregion //) ===== UITLITY =====		
 	}

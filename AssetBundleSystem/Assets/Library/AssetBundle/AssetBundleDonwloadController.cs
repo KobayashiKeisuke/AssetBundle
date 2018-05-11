@@ -22,7 +22,7 @@ namespace AssetManagerSystem
 
 		/* コールバック定義 */
 		public delegate void OnCompleteDownloadEachBundle( bool _isSucceeded, AssetBundle _bundle);				// AssetBundle 1個ずつDLが終わるたびに呼ぶコールバック
-		public delegate void OnCompleteDownloadAllBundle( int _isSucceededCount, AssetBundle[] _bundle);		// AssetBundle 全部がDL終了したときのコールバック
+		public delegate void OnCompleteDownloadAllBundle( int _isSucceededCount, string[] _failedList);			// AssetBundle 全部がDL終了したときのコールバック
 		
 		#endregion //) ===== CONSTS =====
 		
@@ -61,43 +61,65 @@ namespace AssetManagerSystem
 		#region ===== DONWLOAD_ENGINE =====
 
 		/// <summary>
-		/// 指定のAssetBundle のDownload 処理
+		/// AssetBundle のDonwload
 		/// </summary>
-		/// <param name="_assetBundleName">AssetBundle 名</param>
-		/// <param name="_onComplete"></param>
+		/// <param name="_bundleNames">AssetBundle名(複数)</param>
+		/// <param name="_onEachComplete">各AssetBundle のDL完了時コールバック</param>
+		/// <param name="_onAllComplete">全AssetBudle のDL完了コールバック</param>
 		/// <returns></returns>
-		public IEnumerator DoDownloadAssetBundle( string _assetBundleName, OnCompleteDownloadEachBundle _onComplete )
+		public IEnumerator DoDownloadAssetBundles( string[] _bundleNames, OnCompleteDownloadEachBundle _onEachComplete, OnCompleteDownloadAllBundle _onAllComplete)
 		{
+			Debug.LogWarning("Start Download");
 			// DL 対象が無い
-			if( string.IsNullOrEmpty( _assetBundleName ))
+			if( _bundleNames == null || _bundleNames.Length < 1)
 			{
-				_onComplete.Invoke( false, null);
+				_onAllComplete.Invoke( 0, _bundleNames );
 				yield break;
 			}
+			// Download 開始宣言
+			OnBeginDownload( _bundleNames.Length );
+			// 失敗したリストを用意
+			List<string> failedList = new List<string>();
 
-			// TODO: 複数AssetDownload 対応
-			OnBeginDownload( 1 );
-
-			string uri = string.Empty;
-			UnityWebRequest webRequest = UnityWebRequest.GetAssetBundle( uri:uri );
-			webRequest.downloadHandler = new AssetBundleDownloadHandler( OnCompleteDownload );
-			// 登録
-			m_currentDownloadRequestList.Add( webRequest );
-
-			// DL 開始 & 終了待機
-			yield return webRequest.SendWebRequest();
-
-			// 登録解除
-			m_currentDownloadRequestList.Remove( webRequest );
-
-			bool _isSucceeded = ( ! webRequest.isHttpError && !webRequest.isNetworkError);
-			if( _onComplete != null )
+			//各アセットのDownload
+			for (int i = 0; i < _bundleNames.Length; i++)
 			{
-				_onComplete.Invoke( _isSucceeded, DownloadHandlerAssetBundle.GetContent(webRequest));
+				string uri = string.Format("{0}/{1}/{2}", AssetBundleUtility.HOST,AssetBundleUtility.GetPlatformName(),_bundleNames[i]);
+				UnityWebRequest webRequest = UnityWebRequest.GetAssetBundle( uri:uri );
+				// webRequest.downloadHandler = new AssetBundleDownloadHandler( OnCompleteDownload );
+				// 登録
+				m_currentDownloadRequestList.Add( webRequest );
+
+				// DL 開始 & 終了待機
+				yield return webRequest.SendWebRequest();
+
+				OnCompleteDownload();
+				
+				// 登録解除
+				m_currentDownloadRequestList.Remove( webRequest );
+
+				bool isSucceeded = ( ! webRequest.isHttpError && !webRequest.isNetworkError);
+				if( _onEachComplete != null )
+				{
+					_onEachComplete.Invoke( isSucceeded, DownloadHandlerAssetBundle.GetContent(webRequest));
+				}
+
+				if( !isSucceeded)
+				{
+					failedList.Add( _bundleNames[i]);
+				}
 			}
 
+			Debug.LogWarning("End Download");
+
+
+			// Complete 処理
+			if( _onAllComplete != null )
+			{
+				_onAllComplete.Invoke( _bundleNames.Length - failedList.Count, failedList.ToArray() );
+			}
 		}
-	
+
 		#endregion //) ===== DONWLOAD_ENGINE =====
 
 
