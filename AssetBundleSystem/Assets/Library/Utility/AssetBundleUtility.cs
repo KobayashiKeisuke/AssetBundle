@@ -24,7 +24,7 @@ namespace AssetManagerSystem
 		/// <returns></returns>
 		public static string GetAssetBundlePath( string _assetBundleName )
 		{
-			return Path.Combine( Application.streamingAssetsPath, _assetBundleName);
+			return Path.Combine( Caching.currentCacheForWriting.path, _assetBundleName);
 		}
 
 
@@ -83,6 +83,35 @@ namespace AssetManagerSystem
                 default:
                     return null;
             }
+        }
+
+
+        /// <summary>
+        /// ファイル書き込み
+        /// </summary>
+        public static bool WriteFile(string file, byte[] data)
+        {
+            var path = GetAssetBundlePath(file);
+
+            try
+            {
+                var directory = System.IO.Path.GetDirectoryName(path);
+                if (!System.IO.Directory.Exists(directory))
+                {
+                    System.IO.Directory.CreateDirectory(directory);
+                }
+                // TODO: 暗号化
+                using (FileStream fs = new FileStream(path, FileMode.Create, System.IO.FileAccess.Write))
+                {
+                    fs.Write(data, 0, data.Length);
+                }
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                Debug.Log(e.ToString());
+            }
+            return false;
         }
 	}
 

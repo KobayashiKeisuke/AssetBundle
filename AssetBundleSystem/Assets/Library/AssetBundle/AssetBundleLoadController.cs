@@ -288,6 +288,8 @@ namespace AssetManagerSystem
 
 			return AssetBundleCacheController.ClearTargetAssetCache( _assetName, Manifest.BundleManifest);
 		}
+
+		public bool IsCached(string _assetBundleName){ return AssetBundleCacheController.IsCached( _assetBundleName, Manifest.BundleManifest.GetAssetBundleHash(_assetBundleName) );}
 		#endregion //) ===== CACHE =====
 
 		#endregion //) ===== PUBLIC_API =====
@@ -426,10 +428,38 @@ namespace AssetManagerSystem
 			}
 		}
 
+		/// <summary>
+		/// 対象のAssetのUnload
+		/// </summary>
+		/// <param name="_target"></param>
+		public void UnloadAsset( UnityEngine.Object _target )
+		{
+			if( _target == null )
+			{
+				return;
+			}
+
+			foreach( KeyValuePair<string, AssetData> pair in LoadedAssetList )
+			{
+				// if( pair.Value.IsContainsAsset(_assetName))
+				// {
+				// 	return pair.Value;
+				// }
+			}
+		}
+
+		public void ForceClearList()
+		{
+			foreach( KeyValuePair<string, AssetData> pair in LoadedAssetList )
+			{
+				pair.Value.TargetBundle.Unload(false);
+			}
+			LoadedAssetList.Clear();
+		}
 		#endregion ===== LOADED_ASSET_BUNDLE =====
 			
 
-		//DOwnload
+		//Download
 		public float GetProgress(){ return m_downloadCtrl == null ? -1.0f : m_downloadCtrl.GetCurrentProgress();}
 
 
@@ -494,7 +524,7 @@ namespace AssetManagerSystem
 				return null;
 			}
 
-			for (int i = list.Count-1; i <= 0; i--)
+			for (int i = list.Count-1; 0 <= i; --i)
 			{
 				if( string.IsNullOrEmpty( list[i]))
 				{

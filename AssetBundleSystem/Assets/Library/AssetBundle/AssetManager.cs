@@ -94,7 +94,25 @@ namespace AssetManagerSystem
 		/// 具体的にはLoadController が実行
 		/// </summary>
 		/// <param name="_target"></param>
-		public void UnloadAsset(Object _target){}
+		public void UnloadAsset(Object _target)
+		{
+			if( m_loadCtrl == null )
+			{
+				return;
+			}
+
+			m_loadCtrl.UnloadAsset( _target );
+		}
+
+		public void ForceClearList()
+		{
+			if( m_loadCtrl == null )
+			{
+				return;
+			}
+
+			m_loadCtrl.ForceClearList( );			
+		}
 
 
 		//--------------------------------------------
@@ -115,6 +133,10 @@ namespace AssetManagerSystem
 		/// <returns>true:成功, false: 異常終了orどこかでまだ参照を持っているものが1つ以上残っている</returns>
 		public bool ClearAllAssetCache( ){ return AssetBundleCacheController.ClearAllAssetCache(); }
 
+
+		#if UNITY_EDITOR
+		public bool IsCached(string _assetBundleName){return m_loadCtrl.IsCached(_assetBundleName); }
+		#endif
 		#endregion //) ===== CACHE =====
 
 
